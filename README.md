@@ -1,1 +1,1 @@
-# strategy_ratios
+# strategy-ratios
