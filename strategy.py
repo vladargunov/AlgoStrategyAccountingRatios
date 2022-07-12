@@ -10,6 +10,7 @@ from sklearn.linear_model import LinearRegression
 
 class Strategy(ABC):
     def __init__(self, datamodule):
+        # Module should be put at init to ensure what data can be used
         self.dm = datamodule
 
     @abstractmethod
@@ -22,7 +23,7 @@ class Strategy(ABC):
 
 
 class OLSRatios(Strategy):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, datamodule):
+        super().__init__(datamodule)
 
         self.reg = LinearRegression()
