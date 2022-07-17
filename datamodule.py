@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+import datetime
+from datetime import date, timedelta
 
 
 class DataModule():
@@ -22,22 +24,50 @@ class DataModule():
         print(f'Total available stocks: {len(self.tickers)}')
         return self.tickers
 
-    def _get_dates(self, ticker, start_date, end_date, days_from_end_date):
+    def _get_dates(self, ticker, start_date, end_date):
         """
         Returns a numpy array of dates
         """
-        dates = self.data[( self.data['ticker'] == ticker ) & ( self.data['date'] >= start_date )
-                & ( self.data['date'] <= end_date )]['date'].to_numpy()
+        if ticker == 'all':
+            dates = self.data[ ( self.data['date'] >= start_date )
+                    & ( self.data['date'] <= end_date )]['date'].to_numpy()
+        else:
+            dates = self.data[( self.data['ticker'] == ticker ) & ( self.data['date'] >= start_date )
+                    & ( self.data['date'] <= end_date )]['date'].to_numpy()
 
-        if days_from_end_date is not None:
-            assert isinstance(days_from_end_date, int) and days_from_end_date > 0, \
-            "Warning! days_from_end_date is set incorrectly."
-            dates = dates[(-1 - days_from_end_date):]
+
 
         return dates
 
-    def get_prices(self, ticker, start_date='2005-01-04', end_date='2022-05-11',
-                   days_from_end_date=None, verbose=False):
+    @staticmethod
+    def choose_weekday(selected_date):
+        """
+        Accepts both isoformat and date format
+        If weekday, gets the same date
+        If weekend, returns the next monday
+        Returns everything in the format "yyyy-mm-dd"
+        """
+        if isinstance(selected_date, str):
+            selected_date = date.fromisoformat(selected_date)
+
+        assert isinstance(selected_date, datetime.date), ('Warning, selected date'
+                                                  'is not a datetime.date format!')
+
+        if selected_date.isoweekday() == 6:
+            selected_date += timedelta(days=2)
+        elif selected_date.isoweekday() == 7:
+            selected_date += timedelta(days=1)
+
+        assert selected_date.isoweekday() <= 5, 'Warning, first date is chosen to be a weekend!'
+        return selected_date.isoformat()
+
+    def _keep_dates(self, dates):
+        """
+        Keeps given dates from the datamodule and delete everything else
+        """
+        self.data = self.data[~self.data['date'].isin(dates)]
+
+    def get_prices(self, ticker, start_date='2005-01-04', end_date='2022-05-11', verbose=False):
         """
         Returns all available prices and dates of a ticker over the date interval
         ticker : ticker of the stock to be chosen
@@ -46,7 +76,7 @@ class DataModule():
         days_from_end_date : if not None, sets the start_date n days from the end_date
         """
         assert ticker in self.tickers, "Warning! Ticker is not available."
-        dates = self._get_dates(ticker, start_date, end_date, days_from_end_date)
+        dates = self._get_dates(ticker, start_date, end_date)
 
 
         prices = (
@@ -92,22 +122,22 @@ class DataModule():
     @staticmethod
     def print_available_features():
         print('open : The open price of the trading day\n' \
-             'close : The close price of the trading day\n' \
-             'high : The highest price of the trading day\n' \
-             'low : The lowest price of the trading day\n' \
-             'volume : The trading volume of the trading day\n' \
-             'outstanding_share : A company\'s stock currently held by all its shareholders\n' \
-             'turnover : A measure of stock liquidity, calculated by dividing the total number of ' \
-             'shares traded during the trading day by the ' \
-             'average number of shares outstanding for the same trading day.\n' \
-             'pe : PE (price to earnings) ratio\n' \
-             'pe_ttm : Trailing Twelve Months PE ratio: the current share price divided by the' \
-             'last 4 quarterly EPS (earnings per share).\n' \
-             'pb : PB ratio (price to book ratio)\n' \
-             'ps : PS ratio (price to sales ratio)\n' \
-             'ps_ttm : Trailing 12 months PS ratio\n' \
-             'dv_ratio : Dividend yield ratio (the percentage of a company\'s '
-             'share price that it pays out)\n' \
-             'dv_ttm : Trailing 12 months Dividend yield ratio\n' \
-             'total_mv : Total market capitalization\n' \
-             'qfq_factor : The price adjustment factor')
+              'close : The close price of the trading day\n' \
+              'high : The highest price of the trading day\n' \
+              'low : The lowest price of the trading day\n' \
+              'volume : The trading volume of the trading day\n' \
+              'outstanding_share : A company\'s stock currently held by all its shareholders\n' \
+              'turnover : A measure of stock liquidity, calculated by dividing the total number of ' \
+              'shares traded during the trading day by the ' \
+              'average number of shares outstanding for the same trading day.\n' \
+              'pe : PE (price to earnings) ratio\n' \
+              'pe_ttm : Trailing Twelve Months PE ratio: the current share price divided by the' \
+              'last 4 quarterly EPS (earnings per share).\n' \
+              'pb : PB ratio (price to book ratio)\n' \
+              'ps : PS ratio (price to sales ratio)\n' \
+              'ps_ttm : Trailing 12 months PS ratio\n' \
+              'dv_ratio : Dividend yield ratio (the percentage of a company\'s '
+              'share price that it pays out)\n' \
+              'dv_ttm : Trailing 12 months Dividend yield ratio\n' \
+              'total_mv : Total market capitalization\n' \
+              'qfq_factor : The price adjustment factor')
