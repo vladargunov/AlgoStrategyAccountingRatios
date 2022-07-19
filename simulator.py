@@ -2,7 +2,8 @@ import numpy as np
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 
-
+from tqdm import tqdm
+import wandb
 
 
 class Simulator():
@@ -26,6 +27,13 @@ class Simulator():
         If the selected date by the simulator is not available,
         then the nearest available date is chosen and the trading interval
         follows from such date
+
+        Comment on self.strategy.required_number_dates:
+        The simulator will not execute anything until the self.dates
+        will contain the sufficient number of time observations as required by
+        self.strategy in self.strategy.required_number_dates.
+        That is, there will be a warm up period from the start date by the number of
+        intervals defined by self.strategy.required_number_dates
         """
         self.datamodule = datamodule
         self.portfolio = portfolio
@@ -33,14 +41,14 @@ class Simulator():
         self.frequency = frequency
         self.start_date = start_date
         self.end_date = end_date
-        self.dates = self._adjust_available_dates()
+        self.dates = self.get_available_dates()
 
         # Metrics
-        self.sharpe = 0
-        self.return_to_drawdown = 0
+        self.sharpe = None
+        self.return_to_drawdown = None
 
 
-    def _adjust_available_dates(self):
+    def get_available_dates(self):
         """
         Gets available dates at which the stocks can be traded and
         adjust the datamodule
@@ -49,19 +57,16 @@ class Simulator():
                                                      'frequency is chosen incorrectly!')
 
         dates_remained = self.datamodule._get_dates(ticker='all', start_date=self.start_date,
-                        end_date=self.end_date)
+                                                    end_date=self.end_date)
 
         if self.frequency == 'daily':
             return list(dates_remained)
 
-
         # Get first a weekday
         first_date = self.datamodule.choose_weekday(dates_remained[0])
 
-
         # Compute the remaining dates of the sample
         selected_dates = [first_date]
-
         current_date = first_date
 
         while current_date < dates_remained[-1]:
@@ -80,14 +85,64 @@ class Simulator():
                 current_date = current_weekday
                 current_weekday = current_weekday.isoformat()
 
-
             selected_dates.append(current_weekday)
-
             current_date = current_date.isoformat()
-
 
         return selected_dates[:-1]
 
 
-    def simulate(self):
-        pass
+    def simulate(self, log_metrics_wandb=True):
+        # Log initial portfolio value
+        if log_metrics_wandb:
+            wandb.log("Portfolio value", self.portfolio.value)
+
+        for idx, date in enumerate(tqdm(self.dates, desc='Simulation in progress', ncols=100)):
+            if idx < self.strategy.required_number_dates:
+                continue
+            # Returns the strategy data that is needed to create a portfolio for dates
+            # before the current_date
+            strategy_data = self.datamodule._get_trailing_data(
+                                            dates=self.dates,
+                                            number_previous_dates=self.strategy.required_number_dates,
+                                            current_date=date
+                                                                )
+            # Returns a dictionary of allocated weights to available tickers
+            current_portfolio = self.strategy.create_portfolio(strategy_data)
+
+            # Allocates the positions from current_portfolio to portfolio
+            # and gets the current prices
+            diff_prices = {}
+            for ticker in current_portfolio.keys():
+                self.portfolio.allocate_position(ticker, current_portfolio.get(ticker))
+                ticker_prices, _ = self.datamodule.get_prices(ticker, self.dates[max((idx-2),0):idx], diff_prices=True)
+
+                if len(ticker_prices) > 0:
+                    if not np.isnan(ticker_prices[-1]):
+                        diff_prices[ticker] = ticker_prices[-1]
+                        print(diff_prices[ticker])
+                    else:
+                        raise ValueError(('Change in prices was not computed correctly! \n'
+                                          'Possibly the starting date was chosen too early.'))
+                else:
+                    raise ValueError(('Change in prices was not computed correctly! \n'
+                                      'Possibly the starting date was chosen too early.'))
+
+            self.portfolio.update_portfolio(diff_prices)
+
+            if log_metrics_wandb:
+                wandb.log("Portfolio value", self.portfolio.value)
+
+    def compute_metrics(self, risk_free_rate=.01, log_metrics_wandb=True, verbose=False):
+        # Return to Drawdown
+        self.return_to_drawdown = self.portfolio.value_cache[-1] / min(self.portfolio.value_cache)
+
+        # Sharpe
+        excess_return = np.array([val / self.portfolio.value_cache[0] for val
+                                in self.portfolio.value_cache[1:]]) - risk_free_rate
+        mean = np.mean(excess_return)
+        stdev = np.stdev(excess_return)
+        self.sharpe = mean / stdev
+
+        if verbose:
+            print(f'Sharpe: {self.sharpe:.2f}')
+            print(f'Return to Drawdown: {self.return_to_drawdown:.2f}')

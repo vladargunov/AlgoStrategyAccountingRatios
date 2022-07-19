@@ -5,12 +5,22 @@ from datetime import date, timedelta
 
 
 class DataModule():
+    start_date_datamodule = '2005-01-04'
+
     def __init__(self):
         self.tickers = pd.read_csv('./data/ticker_info.csv')['ticker'].unique()
-        self.data = pd.read_csv('./data/stock_data.csv')
+        self.data = self._get_data()
         self.features = ['open', 'high', 'low', 'close', 'volume', 'outstanding_share',
                          'turnover', 'pe', 'pe_ttm', 'pb', 'ps', 'ps_ttm', 'dv_ratio',
                           'dv_ttm', 'total_mv', 'qfq_factor']
+
+    def _get_data(self):
+        data = pd.read_csv('./data/stock_data.csv')
+        data['price'] = (data['open'] + data['close']) / 2
+        return data
+
+
+
 
 
     def delete_stocks(self, stocks):
@@ -34,8 +44,6 @@ class DataModule():
         else:
             dates = self.data[( self.data['ticker'] == ticker ) & ( self.data['date'] >= start_date )
                     & ( self.data['date'] <= end_date )]['date'].to_numpy()
-
-
 
         return dates
 
@@ -67,7 +75,8 @@ class DataModule():
         """
         self.data = self.data[~self.data['date'].isin(dates)]
 
-    def get_prices(self, ticker, start_date='2005-01-04', end_date='2022-05-11', verbose=False):
+    def get_prices(self, ticker, dates, diff_prices=False,
+                   numpy_format=True,verbose=False):
         """
         Returns all available prices and dates of a ticker over the date interval
         ticker : ticker of the stock to be chosen
@@ -76,15 +85,13 @@ class DataModule():
         days_from_end_date : if not None, sets the start_date n days from the end_date
         """
         assert ticker in self.tickers, "Warning! Ticker is not available."
-        dates = self._get_dates(ticker, start_date, end_date)
 
+        prices = self.data[( self.data['ticker'] == ticker ) & ( self.data['date'].isin(dates) )]['price']
+        if diff_prices:
+            prices = prices.diff()
 
-        prices = (
-                    (
-                 self.data[( self.data['ticker'] == ticker ) & ( self.data['date'].isin(dates) )]['open'] +
-                 self.data[( self.data['ticker'] == ticker ) & ( self.data['date'].isin(dates) )]['close']
-                    ) / 2
-                  ).to_numpy()
+        if numpy_format:
+            prices = prices.to_numpy()
 
         if verbose:
             print(f'Ticker: {ticker}')
@@ -93,6 +100,16 @@ class DataModule():
             print(f'Price is calculated as average of open and close')
 
         return prices, dates
+
+    def _get_trailing_data(self, dates, number_previous_dates, current_date):
+        """
+        Gets the trailing data for number_previous_dates time periods from current dates
+        over dates.
+        """
+        index_current_date = dates.index(current_date)
+        required_dates = dates[max(index_current_date - number_previous_dates, 0):index_current_date]
+
+        return self.data[self.data['date'].isin(required_dates)]
 
     def get_feature(self, ticker, feature, start_date='2005-01-04', end_date='2022-05-11',
                     days_from_end_date=None, verbose=False):
