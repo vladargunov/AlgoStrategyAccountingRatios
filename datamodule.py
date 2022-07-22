@@ -20,19 +20,15 @@ class DataModule():
         return data
 
 
-
-
-
     def delete_stocks(self, stocks):
         self.tickers = np.delete(self.tickers, stocks)
         print(f'Deleted {len(sotcks)} stocks')
         print(f'Remaining number of stocks: {len(self.tickers)}')
 
 
-    def get_tickers(self):
-        print('...Returning Tickers...')
-        print(f'Total available stocks: {len(self.tickers)}')
-        return self.tickers
+    def get_tickers(self, date):
+        return self.data[self.data['date'] == date]['ticker'].unique()
+
 
     def _get_dates(self, ticker, start_date, end_date):
         """
@@ -75,31 +71,27 @@ class DataModule():
         """
         self.data = self.data[~self.data['date'].isin(dates)]
 
-    def get_prices(self, ticker, dates, diff_prices=False,
-                   numpy_format=True,verbose=False):
+    def get_diff_and_current_prices(self, tickers, start_date, end_date):
         """
-        Returns all available prices and dates of a ticker over the date interval
-        ticker : ticker of the stock to be chosen
+        Returns diff prices of all specified tickers over the date interval specified
+        by start_date, end_date. Also returns prices at the start_date
+        ticker : tickers of the stocks to be chosen
         start_date
         end_date
-        days_from_end_date : if not None, sets the start_date n days from the end_date
         """
-        assert ticker in self.tickers, "Warning! Ticker is not available."
+        assert set(tickers).issubset(self.tickers), "Warning! Some tickers are not available."
 
-        prices = self.data[( self.data['ticker'] == ticker ) & ( self.data['date'].isin(dates) )]['price']
-        if diff_prices:
-            prices = prices.diff()
+        prices_start = self.data[( self.data['ticker'].isin(tickers) ) &
+                        ( self.data['date'] == start_date )][['ticker', 'price']]
+        prices_start.set_index('ticker', inplace=True)
 
-        if numpy_format:
-            prices = prices.to_numpy()
+        prices_end = self.data[( self.data['ticker'].isin(tickers) ) &
+                        ( self.data['date'] == end_date )][['ticker', 'price']]
+        prices_end.set_index('ticker', inplace=True)
 
-        if verbose:
-            print(f'Ticker: {ticker}')
-            print(f'Start date: {dates[0]}')
-            print(f'Total days available: {len(dates)}')
-            print(f'Price is calculated as average of open and close')
+        prices_diff = prices_end.subtract(prices_start).dropna()
 
-        return prices, dates
+        return prices_diff.to_dict()['price'], prices_start.to_dict()['price']
 
     def _get_trailing_data(self, dates, number_previous_dates, current_date):
         """

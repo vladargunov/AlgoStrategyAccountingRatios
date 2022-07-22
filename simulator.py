@@ -48,6 +48,7 @@ class Simulator():
         self.return_to_drawdown = None
 
 
+
     def get_available_dates(self):
         """
         Gets available dates at which the stocks can be traded and
@@ -106,28 +107,22 @@ class Simulator():
                                             number_previous_dates=self.strategy.required_number_dates,
                                             current_date=date
                                                                 )
+
+            # Get tickers that are available to trade at the current_date
+            available_tickers = self.datamodule.get_tickers(date)
             # Returns a dictionary of allocated weights to available tickers
-            current_portfolio = self.strategy.create_portfolio(strategy_data)
+            strategy_portfolio = self.strategy.create_portfolio(strategy_data, available_tickers)
 
-            # Allocates the positions from current_portfolio to portfolio
-            # and gets the current prices
-            diff_prices = {}
-            for ticker in current_portfolio.keys():
-                self.portfolio.allocate_position(ticker, current_portfolio.get(ticker))
-                ticker_prices, _ = self.datamodule.get_prices(ticker, self.dates[max((idx-2),0):idx], diff_prices=True)
+            # Allocates the positions from strategy_portfolio to portfolio
+            self.portfolio.allocate_positions(strategy_portfolio)
 
-                if len(ticker_prices) > 0:
-                    if not np.isnan(ticker_prices[-1]):
-                        diff_prices[ticker] = ticker_prices[-1]
-                        print(diff_prices[ticker])
-                    else:
-                        raise ValueError(('Change in prices was not computed correctly! \n'
-                                          'Possibly the starting date was chosen too early.'))
-                else:
-                    raise ValueError(('Change in prices was not computed correctly! \n'
-                                      'Possibly the starting date was chosen too early.'))
+            # Change the portfolio based on the latest prices
+            diff_prices, start_prices = self.datamodule.get_diff_and_current_prices(available_tickers,
+                                                   self.dates[(idx-1)], self.dates[idx])
 
-            self.portfolio.update_portfolio(diff_prices)
+            self.portfolio.update_portfolio(diff_prices, start_prices)
+            print(date)
+            print(self.portfolio.value)
 
             if log_metrics_wandb:
                 wandb.log("Portfolio value", self.portfolio.value)
@@ -137,10 +132,10 @@ class Simulator():
         self.return_to_drawdown = self.portfolio.value_cache[-1] / min(self.portfolio.value_cache)
 
         # Sharpe
-        excess_return = np.array([val / self.portfolio.value_cache[0] for val
+        excess_return = np.array([(val / self.portfolio.value_cache[0] - 1) for val
                                 in self.portfolio.value_cache[1:]]) - risk_free_rate
         mean = np.mean(excess_return)
-        stdev = np.stdev(excess_return)
+        stdev = np.std(excess_return)
         self.sharpe = mean / stdev
 
         if verbose:

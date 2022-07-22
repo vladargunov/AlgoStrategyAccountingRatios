@@ -11,7 +11,7 @@ class BaseStrategy(ABC):
             super().__init__(required_number_dates=***)
             # Some code
 
-        def create_portfolio(self, strategy_data)  -> dict:
+        def create_portfolio(self, strategy_data, available_tickers)  -> dict:
             # Some code
     """
     def __init__(self, requires_diff_data=None, required_number_dates=None):
@@ -22,7 +22,7 @@ class BaseStrategy(ABC):
             raise NotImplementedError('Strategy must set the value for required_number_dates (int >= 2)!')
 
     @abstractmethod
-    def create_portfolio(self, strategy_data) -> dict:
+    def create_portfolio(self, strategy_data, available_tickers) -> dict:
         pass
 
 
@@ -31,5 +31,5 @@ class TestStrategy(BaseStrategy):
         super().__init__(required_number_dates=2)
 
 
-    def create_portfolio(self, strategy_data) -> dict:
+    def create_portfolio(self, strategy_data, available_tickers) -> dict:
         return {'sh600000' : 1}
