@@ -92,7 +92,7 @@ class Simulator():
         return selected_dates[:-1]
 
 
-    def simulate(self, log_metrics_wandb=True):
+    def simulate(self, log_metrics_wandb=True, verbose=True):
         # Log initial portfolio value
         if log_metrics_wandb:
             wandb.log("Portfolio value", self.portfolio.value)
@@ -121,8 +121,18 @@ class Simulator():
                                                    self.dates[(idx-1)], self.dates[idx])
 
             self.portfolio.update_portfolio(diff_prices, start_prices)
-            print(date)
-            print(self.portfolio.value)
+
+        if verbose:
+            print('...Printing the portfolio history...')
+            print('-' * 24)
+            print('|' + ' ' * 12 + '|' + ' ' * 9 + '|' )
+            print('|    Date    |  Value  |')
+            print('|' + ' ' * 12 + '|' + ' ' * 9 + '|' )
+            print('-' * 24)
+            for date, value in zip(self.dates[(self.strategy.required_number_dates-1):],
+                                   self.portfolio.value_cache):
+                                   print(f'| {date} | {value:6.2f}  |')
+            print('-' * 24)
 
             if log_metrics_wandb:
                 wandb.log("Portfolio value", self.portfolio.value)

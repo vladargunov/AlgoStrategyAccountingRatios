@@ -9,3 +9,6 @@ __pycache__/
 
 #Data
 data
+
+#My makefile
+Makefile

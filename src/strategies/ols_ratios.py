@@ -22,7 +22,7 @@ class OLSRatios(BaseStrategy):
         bought long, and all stocks forecasted below are sold short
         'quartile' <- all stocks are bought from the first quartile,
         and all the stocks sold are from the last quartile, the
-        remaining are not entered into teh portfolio
+        remaining are not entered into the portfolio
         'octile' <- the same strategy as for 'quartile' but using
         the octiles for decision rules
 
@@ -33,6 +33,8 @@ class OLSRatios(BaseStrategy):
         super().__init__(required_number_dates=OLSCFG.required_number_dates)
 
         self.decision_rule = OLSCFG.decision_rule
+        assert self.decision_rule in ['median', 'quartile', 'octile'], ('Warning,'
+                                         'Decision rule is specified incorrectly!')
         self.reg = LinearRegression()
 
         self.train_interval = True
@@ -73,17 +75,27 @@ class OLSRatios(BaseStrategy):
         pred_tickers = latest_data['ticker']
 
         preds = self.reg.predict(pred_x)
+        preds = pd.DataFrame(preds, index=pred_tickers, columns=['prediction'])
 
         if self.decision_rule == 'median':
-            median = np.median(preds)
-            preds = pd.DataFrame(preds, index=pred_tickers, columns=['prediction'])
-            preds['prediction'] = [1 if x>median else -1 if x<median else 0 for x in preds['prediction']]
+            upper_cutoff = np.median(preds)
+            lower_cutoff = np.median(preds)
+
+        elif self.decision_rule == 'quartile':
+            upper_cutoff = np.quantile(preds, .75)
+            lower_cutoff = np.quantile(preds, .25)
+
+        elif self.decision_rule == 'octile':
+            upper_cutoff = np.quantile(preds, .875)
+            lower_cutoff = np.quantile(preds, .125)
+
+        preds['prediction'] = [1 if x>upper_cutoff else -1 if x<lower_cutoff else 0 for x in preds['prediction']]
 
         # Count the values of long and short
         number_long = preds[preds['prediction'] == 1]['prediction'].shape[0]
         number_short = preds[preds['prediction'] == -1]['prediction'].shape[0]
 
         preds.loc[preds['prediction'] == 1, 'prediction'] = 1 / number_long
-        preds.loc[preds['prediction'] == -1, 'prediction'] = -1 / number_long
+        preds.loc[preds['prediction'] == -1, 'prediction'] = -1 / number_short
 
         return preds.to_dict()['prediction']
