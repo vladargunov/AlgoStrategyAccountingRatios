@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 
-from strategies.base_strategy import BaseStrategy
-from strategies.cfg import NNCFG
+from src.strategies.base_strategy import BaseStrategy
+from src.strategies.cfg import NNCFG
 
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer, seed_everything
 from pytorch_lightning.loggers import CSVLogger
@@ -15,18 +15,23 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
 
 
-class NNRatiosRegression(LightningModule):
+class NNRatiosModel(LightningModule):
     def __init__(self, input_shape,
                  hidden_shape=NNCFG.hidden_shape):
         super().__init__()
         self.layer_1 = nn.Linear(input_shape, hidden_shape)
         self.activation = nn.Tanh()
-        self.layer_2 = nn.Linear(hidden_shape, 1)
-
-        self.loss = nn.MSELoss()
-
-    def __repr__(self):
-        return f'NNRatiosRegression(hidden_shape={NNCFG.hidden_shape})'
+        if NNCFG.type_model == 'regression':
+            self.layer_2 = nn.Linear(hidden_shape, 1)
+            self.loss = nn.MSELoss()
+        elif NNCFG.type_model == 'classification':
+            self.loss = nn.CrossEntropyLoss()
+            if NNCFG.decision_rule == 'median':
+                self.layer_2 = nn.Linear(hidden_shape, 2)
+            elif NNCFG.decision_rule == 'quartile':
+                self.layer_2 = nn.Linear(hidden_shape, 4)
+            elif NNCFG.decision_rule == 'octile':
+                self.layer_2 = nn.Linear(hidden_shape, 8)
 
     def forward(self, x):
         x = self.layer_1(x)
@@ -40,6 +45,8 @@ class NNRatiosRegression(LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, y = batch
+        if NNCFG.type_model == 'classification':
+            y = y.squeeze()
         out = self(x)
         train_loss = self.loss(out, y)
         if NNCFG.log_loss:
@@ -48,11 +55,12 @@ class NNRatiosRegression(LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
+        if NNCFG.type_model == 'classification':
+            y = y.squeeze()
         out = self(x)
         val_loss = self.loss(out, y)
         if NNCFG.log_loss:
             self.log("val_loss", val_loss)
-
 
 
 class DataModule(LightningDataModule):
@@ -65,6 +73,9 @@ class DataModule(LightningDataModule):
 
         self.data_x = torch.nan_to_num(self.data_x)
         self.data_y = torch.nan_to_num(self.data_y)
+
+        if NNCFG.type_model == 'classification':
+            self.data_y = torch.tensor(self.data_y, dtype=torch.int64)
 
         self.x_tr, self.x_val, self.y_tr, self.y_val = train_test_split(self.data_x, self.data_y, test_size=NNCFG.val_size)
 
@@ -112,11 +123,15 @@ class NNRatios(BaseStrategy):
 
         self.train_interval = True
 
-        self.column_y = 'return'
+        if NNCFG.type_model == 'regression':
+            self.column_y = 'return'
+        elif NNCFG.type_model == 'classification':
+            self.column_y = 'ranking'
+
         self.columns_x = ['outstanding_share', 'turnover', 'pe', 'pe_ttm', 'pb',
                           'ps', 'ps_ttm', 'dv_ratio', 'dv_ttm', 'total_mv', 'qfq_factor']
 
-        self.model = NNRatiosRegression(input_shape=len(self.columns_x))
+        self.model = NNRatiosModel(input_shape=len(self.columns_x))
 
         self.csv_logger = CSVLogger("./nn_logs", name=repr(self.model))
 
@@ -142,6 +157,23 @@ class NNRatios(BaseStrategy):
             current_df = current_df.fillna(0)
             new_df = pd.concat([new_df, current_df])
 
+        if NNCFG.type_model == 'classification':
+            # Put returns in bins
+            min_return = new_df['return'].min()
+            if self.decision_rule == 'median':
+                bins = [min_return, np.median(new_df['return'])]
+            elif self.decision_rule == 'quartile':
+                bins = [min_return]
+                for idx in np.linspace(0.25,.75, 3):
+                    bins.append(np.quantile(new_df['return'], idx))
+            elif self.decision_rule == 'octile':
+                bins = [min_return]
+                for idx in np.linspace(0.125,.875, 7):
+                    bins.append(np.quantile(new_df['return'], idx))
+
+            new_df['ranking'] = np.digitize(new_df['return'], bins)
+            new_df['ranking'] -= 1
+
         train_y = new_df[self.column_y]
         train_x = new_df[self.columns_x]
         return train_x, train_y
@@ -165,22 +197,42 @@ class NNRatios(BaseStrategy):
         pred_tickers = latest_data['ticker']
 
         preds = self.model(pred_x)
+        if NNCFG.type_model == 'classification':
+            preds = preds.softmax(dim=1)
+            preds = torch.argmax(preds, dim=1)
         preds = preds.detach().numpy()
         preds = pd.DataFrame(preds, index=pred_tickers, columns=['prediction'])
 
-        if self.decision_rule == 'median':
-            upper_cutoff = np.median(preds)
-            lower_cutoff = np.median(preds)
 
-        elif self.decision_rule == 'quartile':
-            upper_cutoff = np.quantile(preds, .75)
-            lower_cutoff = np.quantile(preds, .25)
+        if NNCFG.type_model == 'regression':
+            if self.decision_rule == 'median':
+                upper_cutoff = np.median(preds)
+                lower_cutoff = np.median(preds)
 
-        elif self.decision_rule == 'octile':
-            upper_cutoff = np.quantile(preds, .875)
-            lower_cutoff = np.quantile(preds, .125)
+            elif self.decision_rule == 'quartile':
+                upper_cutoff = np.quantile(preds, .75)
+                lower_cutoff = np.quantile(preds, .25)
 
-        preds['prediction'] = [1 if x>upper_cutoff else -1 if x<lower_cutoff else 0 for x in preds['prediction']]
+            elif self.decision_rule == 'octile':
+                upper_cutoff = np.quantile(preds, .875)
+                lower_cutoff = np.quantile(preds, .125)
+
+            preds['prediction'] = [1 if x>upper_cutoff else -1 if x<lower_cutoff else 0 for x in preds['prediction']]
+        elif NNCFG.type_model == 'classification':
+            if self.decision_rule == 'median':
+                long_bin = 1
+                short_bin = 0
+
+            elif self.decision_rule == 'quartile':
+                long_bin = 3
+                short_bin = 0
+
+            elif self.decision_rule == 'octile':
+                long_bin = 7
+                short_bin = 0
+
+
+            preds['prediction'] = [1 if x==long_bin else -1 if x==short_bin else 0 for x in preds['prediction']]
 
         # Count the values of long and short
         number_long = preds[preds['prediction'] == 1]['prediction'].shape[0]

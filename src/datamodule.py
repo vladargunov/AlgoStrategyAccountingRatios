@@ -8,14 +8,14 @@ class DataModule():
     start_date_datamodule = '2005-01-04'
 
     def __init__(self):
-        self.tickers = pd.read_csv('../data/ticker_info.csv')['ticker'].unique()
+        self.tickers = pd.read_csv('data/ticker_info.csv')['ticker'].unique()
         self.data = self._get_data()
         self.features = ['open', 'high', 'low', 'close', 'volume', 'outstanding_share',
                          'turnover', 'pe', 'pe_ttm', 'pb', 'ps', 'ps_ttm', 'dv_ratio',
                           'dv_ttm', 'total_mv', 'qfq_factor']
 
     def _get_data(self):
-        data = pd.read_csv('../data/stock_data.csv')
+        data = pd.read_csv('data/stock_data.csv')
         data['price'] = (data['open'] + data['close']) / 2
         return data
 

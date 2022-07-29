@@ -3,7 +3,8 @@ from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 
 from tqdm import tqdm
-import wandb
+import os
+import joblib
 
 
 class Simulator():
@@ -92,10 +93,7 @@ class Simulator():
         return selected_dates[:-1]
 
 
-    def simulate(self, log_metrics_wandb=True, verbose=True):
-        # Log initial portfolio value
-        if log_metrics_wandb:
-            wandb.log("Portfolio value", self.portfolio.value)
+    def simulate(self, verbose=True):
 
         for idx, date in enumerate(tqdm(self.dates, desc='Simulation in progress', ncols=100)):
             if idx < self.strategy.required_number_dates:
@@ -134,10 +132,8 @@ class Simulator():
                                    print(f'| {date} | {value:6.2f}  |')
             print('-' * 24)
 
-            if log_metrics_wandb:
-                wandb.log("Portfolio value", self.portfolio.value)
 
-    def compute_metrics(self, risk_free_rate=.01, log_metrics_wandb=True, verbose=False):
+    def compute_metrics(self, risk_free_rate=.01, verbose=True):
         # Return to Drawdown
         self.return_to_drawdown = self.portfolio.value_cache[-1] / min(self.portfolio.value_cache)
 
@@ -151,3 +147,16 @@ class Simulator():
         if verbose:
             print(f'Sharpe: {self.sharpe:.2f}')
             print(f'Return to Drawdown: {self.return_to_drawdown:.2f}')
+
+    def save_history(self, model, directory_history='src/strategies/trade_history', filename='history.gz'):
+
+        key = '_'.join([model, self.frequency, self.start_date, self.end_date])
+        current_history = {'history_portfolio' : self.portfolio.value_cache, 'sharpe' : self.sharpe,
+                           'return_to_drawdown' : self.return_to_drawdown}
+
+        if not os.listdir(directory_history):
+            history = {key : current_history}
+            joblib.dump(history, os.path.join(directory_history, filename))
+        else:
+            history = joblib.load(os.path.join(directory_history, filename))
+            history[key] = current_history

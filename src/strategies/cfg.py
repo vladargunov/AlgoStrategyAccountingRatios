@@ -12,13 +12,13 @@ class LogRegCFG:
 
 class NNCFG:
     required_number_dates = 6
+    type_model = 'regression' # 'classification'
     decision_rule = 'median'
-    type_regression = True
     hidden_shape = 128
-    learning_rate = 0.3
+    learning_rate = 1e-2
     momentum = 0.4
     val_size = 0.1
-    batch_size = 30
+    batch_size = 128
     log_loss = True
     log_frequency = 50
     epochs = 3

@@ -3,8 +3,8 @@ import pandas as pd
 
 from sklearn.linear_model import LogisticRegression
 
-from strategies.base_strategy import BaseStrategy
-from strategies.cfg import LogRegCFG
+from src.strategies.base_strategy import BaseStrategy
+from src.strategies.cfg import LogRegCFG
 
 class LogitRatios(BaseStrategy):
     def __init__(self):
