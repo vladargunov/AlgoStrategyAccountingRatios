@@ -45,6 +45,8 @@ class LogitRatios(BaseStrategy):
         self.columns_x = ['outstanding_share', 'turnover', 'pe', 'pe_ttm', 'pb',
                           'ps', 'ps_ttm', 'dv_ratio', 'dv_ttm', 'total_mv', 'qfq_factor']
 
+    def __repr__(self):
+        return '_'.join(['LogReg', LogRegCFG.decision_rule])
 
     def _prepare_data(self, strategy_data):
         new_df = pd.DataFrame(columns=strategy_data.columns)

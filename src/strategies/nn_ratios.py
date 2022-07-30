@@ -147,6 +147,9 @@ class NNRatios(BaseStrategy):
                                callbacks=self.checkpoint_callback,
                                fast_dev_run=False)
 
+    def __repr__(self):
+        return '_'.join(['NN', NNCFG.type_model, NNCFG.hidden_shape, NNCFG.decision_rule])
+
     def _prepare_data(self, strategy_data):
         new_df = pd.DataFrame(columns=strategy_data.columns)
         for ticker in strategy_data['ticker'].unique():

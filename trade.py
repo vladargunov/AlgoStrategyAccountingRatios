@@ -8,11 +8,12 @@ from src.strategies.ols_ratios import OLSRatios
 from src.strategies.logit_ratios import LogitRatios
 from src.strategies.nn_ratios import NNRatios
 
+from src.strategies.cfg import OLSCFG, LogRegCFG, NNCFG
 
-def main(strategy, frequency, initial_value,
-         max_allocation_long, max_allocation_short,
-         start_date, end_date, save_history,
-         risk_free_rate):
+
+def main(strategy, frequency, decision_rule, type_model, initial_value,
+         max_allocation_long, max_allocation_short, start_date,
+         end_date, save_history, risk_free_rate):
 
     print(f'...{strategy}...')
     dm = DataModule()
@@ -22,10 +23,15 @@ def main(strategy, frequency, initial_value,
 
     if strategy == 'OLSRatios':
         sr = OLSRatios()
+        OLSCFG.decision_rule = decision_rule
+
     elif strategy == 'LogitRatios':
         sr = LogitRatios()
+        LogRegCFG.decision_rule = decision_rule
     elif strategy == 'NNRatios':
         sr = NNRatios()
+        NNRatios.decision_rule = decision_rule
+        NNRatios.type_model = type_model
 
 
     sm = Simulator(dm, pf, sr, frequency, start_date, end_date)
@@ -37,15 +43,21 @@ def main(strategy, frequency, initial_value,
         sm.save_history(strategy)
 
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # Add arguments
-    parser.add_argument('-s','--strategy', default='OLSRatios',choices=['OLSRatios', 'LogitRatios', 'NNRatios'],
+    parser.add_argument('-s','--strategy', default='OLSRatios', choices=['OLSRatios', 'LogitRatios', 'NNRatios'],
                         type=str, help='Choose a strategy')
-    parser.add_argument('-f','--frequency', default='yearly',choices=['daily', 'weekly', 'yearly'],
+
+    parser.add_argument('-f','--frequency', default='yearly', choices=['daily', 'weekly', 'monthly', 'yearly'],
                         type=str, help='Choose frequency')
+
+    parser.add_argument('-d','--decision_rule', default='median', choices=['median', 'quartile', 'octile'],
+                        type=str, help='Choose trading decision rule')
+
+    parser.add_argument('-t','--type_model', default='regression', choices=['regression', 'classification'],
+                        type=str, help='Choose model type for NNModel')
 
     parser.add_argument('--initial_value', default=100, type=int, help='Choose initial value of portfolio')
 
@@ -68,7 +80,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    main(args.strategy, args.frequency, args.initial_value,
-             args.max_allocation_long, args.max_allocation_short,
-             args.start_date, args.end_date, args.save_history,
-             args.risk_free_rate)
+    main(args.strategy, args.frequency, args.decision_rule, args.type_model,
+         args.initial_value, args.max_allocation_long, args.max_allocation_short,
+         args.start_date, args.end_date, args.save_history, args.risk_free_rate)

@@ -64,13 +64,14 @@ class Simulator():
         if self.frequency == 'daily':
             return list(dates_remained)
 
-        # Get first a weekday
-        first_date = self.datamodule.choose_weekday(dates_remained[0])
+        # Get first a date
+        first_date = dates_remained[0]
 
         # Compute the remaining dates of the sample
         selected_dates = [first_date]
         current_date = first_date
 
+        # Conditions are checked in isoformat
         while current_date < dates_remained[-1]:
             current_date = date.fromisoformat(current_date)
             if self.frequency == 'weekly':
@@ -80,15 +81,14 @@ class Simulator():
             elif self.frequency == 'yearly':
                 current_date += relativedelta(years=1)
 
-            current_weekday = self.datamodule.choose_weekday(current_date)
-            while (current_weekday not in dates_remained) and (current_weekday < dates_remained[-1]):
-                current_weekday = date.fromisoformat(current_weekday)
-                current_weekday += timedelta(days=1)
-                current_date = current_weekday
-                current_weekday = current_weekday.isoformat()
+            check_date = current_date.isoformat()
+            while (check_date not in dates_remained) and (check_date < dates_remained[-1]):
+                current_date += timedelta(days=1)
+                check_date = current_date.isoformat()
 
-            selected_dates.append(current_weekday)
+            # Append current_date in isoformat
             current_date = current_date.isoformat()
+            selected_dates.append(current_date)
 
         return selected_dates[:-1]
 
@@ -96,7 +96,7 @@ class Simulator():
     def simulate(self, verbose=True):
 
         for idx, date in enumerate(tqdm(self.dates, desc='Simulation in progress', ncols=100)):
-            if idx < self.strategy.required_number_dates:
+            if (idx < self.strategy.required_number_dates) or (date == self.dates[-1]):
                 continue
             # Returns the strategy data that is needed to create a portfolio for dates
             # before the current_date
@@ -127,7 +127,7 @@ class Simulator():
             print('|    Date    |  Value  |')
             print('|' + ' ' * 12 + '|' + ' ' * 9 + '|' )
             print('-' * 24)
-            for date, value in zip(self.dates[(self.strategy.required_number_dates-1):],
+            for date, value in zip(self.dates[self.strategy.required_number_dates:],
                                    self.portfolio.value_cache):
                                    print(f'| {date} | {value:6.2f}  |')
             print('-' * 24)
@@ -148,15 +148,17 @@ class Simulator():
             print(f'Sharpe: {self.sharpe:.2f}')
             print(f'Return to Drawdown: {self.return_to_drawdown:.2f}')
 
-    def save_history(self, model, directory_history='src/strategies/trade_history', filename='history.gz'):
+    def save_history(self, file_path='src/strategies/trade_history/history.gz'):
 
-        key = '_'.join([model, self.frequency, self.start_date, self.end_date])
+        key = '_'.join([repr(self.strategy), self.frequency, self.start_date, self.end_date])
         current_history = {'history_portfolio' : self.portfolio.value_cache, 'sharpe' : self.sharpe,
                            'return_to_drawdown' : self.return_to_drawdown}
 
-        if not os.listdir(directory_history):
+        if not os.path.exists(file_path):
             history = {key : current_history}
-            joblib.dump(history, os.path.join(directory_history, filename))
+            joblib.dump(history, file_path)
         else:
-            history = joblib.load(os.path.join(directory_history, filename))
+            history = joblib.load(file_path)
             history[key] = current_history
+            
+        print(f'Current model is saved to {file_path} with the key {key}')

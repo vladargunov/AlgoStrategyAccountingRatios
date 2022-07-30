@@ -6,7 +6,7 @@ class OLSCFG:
 class LogRegCFG:
     required_number_dates = 6
     decision_rule = 'octile'
-    penalty = 'l2'
+    penalty = 'none'
     regularize_strength = 1.0
 
 
