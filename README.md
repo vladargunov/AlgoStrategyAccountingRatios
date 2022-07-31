@@ -2,7 +2,7 @@
 
 The current report intends to analyse how the ideas outlined in Olson, Mossman (2003)[^1] can be applied to the modern dataset of Chinese stocks available at [Kaggle](https://www.kaggle.com/datasets/franciscofeng/augmented-china-stock-data-with-fundamentals). All the available details can be found in the [report](report.pdf) file within the repo.
 
-[^1]Olson, Dennis \& Mossman, Charles. (2003). Mossman, Neural Network Forecasts of Canadian Stock Returns using Accounting Ratios. International Journal of Forecasting. 19, 453-465. International Journal of Forecasting. 19. 453-465.
+[^1]: Olson, Dennis \& Mossman, Charles. (2003). Mossman, Neural Network Forecasts of Canadian Stock Returns using Accounting Ratios. International Journal of Forecasting. 19, 453-465. International Journal of Forecasting. 19. 453-465.
 
 
 ## Usage
