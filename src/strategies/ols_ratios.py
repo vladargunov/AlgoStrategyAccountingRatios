@@ -6,6 +6,8 @@ from sklearn.linear_model import LinearRegression
 from src.strategies.base_strategy import BaseStrategy
 from src.strategies.cfg import OLSCFG
 
+from sklearn.preprocessing import StandardScaler
+
 class OLSRatios(BaseStrategy):
     def __init__(self):
         """
@@ -29,6 +31,9 @@ class OLSRatios(BaseStrategy):
         train_interval : specifies the intervals when the linear
         regression must be trained before being evaluated, otherwise
         the pretrained regression is used
+
+        Comment on data preprocessing: it is all scaled by StandardScaler
+        before training and inference
         """
         super().__init__(required_number_dates=OLSCFG.required_number_dates)
 
@@ -59,6 +64,11 @@ class OLSRatios(BaseStrategy):
 
         train_y = new_df[self.column_y]
         train_x = new_df[self.columns_x]
+
+        # Normalise data
+        self.scaler = StandardScaler()
+        self.scaler.fit(train_x)
+
         return train_x, train_y
 
 
@@ -75,6 +85,9 @@ class OLSRatios(BaseStrategy):
                                     ( strategy_data['ticker'].isin(available_tickers) )].dropna()
 
         pred_x = latest_data[self.columns_x]
+        # Normalise the input data
+        pred_x = pd.DataFrame(self.scaler.transform(pred_x), columns=self.columns_x)
+
         pred_tickers = latest_data['ticker']
 
         preds = self.reg.predict(pred_x)

@@ -7,13 +7,16 @@ from src.strategies.cfg import NNCFG
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer, seed_everything
 from pytorch_lightning.loggers import CSVLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.utilities import seed_everything
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
+seed_everything(0)
 
 class NNRatiosModel(LightningModule):
     def __init__(self, input_shape,
@@ -114,6 +117,9 @@ class NNRatios(BaseStrategy):
 
         column_y : name of the prediction column
         columns_x : names of the data columns
+
+        Comment on data preprocessing: it is all scaled by StandardScaler
+        before training and inference
         """
         super().__init__(required_number_dates=NNCFG.required_number_dates)
 
@@ -148,7 +154,7 @@ class NNRatios(BaseStrategy):
                                fast_dev_run=False)
 
     def __repr__(self):
-        return '_'.join(['NN', NNCFG.type_model, NNCFG.hidden_shape, NNCFG.decision_rule])
+        return '_'.join(['NN', NNCFG.type_model, str(NNCFG.hidden_shape), NNCFG.decision_rule])
 
     def _prepare_data(self, strategy_data):
         new_df = pd.DataFrame(columns=strategy_data.columns)
@@ -179,6 +185,11 @@ class NNRatios(BaseStrategy):
 
         train_y = new_df[self.column_y]
         train_x = new_df[self.columns_x]
+
+        # Normalise data
+        self.scaler = StandardScaler()
+        self.scaler.fit(train_x)
+
         return train_x, train_y
 
 
@@ -196,6 +207,9 @@ class NNRatios(BaseStrategy):
                                     ( strategy_data['ticker'].isin(available_tickers) )].dropna()
 
         pred_x = latest_data[self.columns_x]
+        # Normalise the input data
+        pred_x = pd.DataFrame(self.scaler.transform(pred_x), columns=self.columns_x)
+
         pred_x = torch.Tensor(pred_x.to_numpy())
         pred_tickers = latest_data['ticker']
 

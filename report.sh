@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # OLS strategy
 python trade.py -s OLSRatios -f monthly -d median -start 2020-07-01 --save_history
 python trade.py -s OLSRatios -f monthly -d quartile -start 2020-07-01 --save_history

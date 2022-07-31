@@ -6,6 +6,8 @@ from sklearn.linear_model import LogisticRegression
 from src.strategies.base_strategy import BaseStrategy
 from src.strategies.cfg import LogRegCFG
 
+from sklearn.preprocessing import StandardScaler
+
 class LogitRatios(BaseStrategy):
     def __init__(self):
         """
@@ -29,6 +31,9 @@ class LogitRatios(BaseStrategy):
         train_interval : specifies the intervals when the linear
         regression must be trained before being evaluated, otherwise
         the pretrained regression is used
+
+        Comment on data preprocessing: it is all scaled by StandardScaler
+        before training and inference
         """
         super().__init__(required_number_dates=LogRegCFG.required_number_dates)
 
@@ -58,6 +63,8 @@ class LogitRatios(BaseStrategy):
             current_df = current_df.dropna()
             new_df = pd.concat([new_df, current_df])
 
+
+
         # Put returns in bins
         min_return = new_df['return'].min()
         if self.decision_rule == 'median':
@@ -71,11 +78,16 @@ class LogitRatios(BaseStrategy):
             for idx in np.linspace(0.125,.875, 7):
                 bins.append(np.quantile(new_df['return'], idx))
 
-
         new_df['ranking'] = np.digitize(new_df['return'], bins)
+        new_df['ranking'] -= 1
 
         train_y = new_df[self.column_y]
         train_x = new_df[self.columns_x]
+
+        # Normalise data
+        self.scaler = StandardScaler()
+        self.scaler.fit(train_x)
+
         return train_x, train_y
 
 
@@ -92,6 +104,9 @@ class LogitRatios(BaseStrategy):
                                     ( strategy_data['ticker'].isin(available_tickers) )].dropna()
 
         pred_x = latest_data[self.columns_x]
+
+        # Normalise the input data
+        pred_x = pd.DataFrame(self.scaler.transform(pred_x), columns=self.columns_x)
         pred_tickers = latest_data['ticker']
 
         preds = self.reg.predict(pred_x)
@@ -99,16 +114,16 @@ class LogitRatios(BaseStrategy):
 
         # Write correct prediction specification
         if self.decision_rule == 'median':
-            long_bin = 2
-            short_bin = 1
+            long_bin = 1
+            short_bin = 0
 
         elif self.decision_rule == 'quartile':
-            long_bin = 4
-            short_bin = 1
+            long_bin = 3
+            short_bin = 0
 
         elif self.decision_rule == 'octile':
-            long_bin = 8
-            short_bin = 1
+            long_bin = 7
+            short_bin = 0
 
         preds['prediction'] = [1 if x==long_bin else -1 if x==short_bin else 0 for x in preds['prediction']]
 

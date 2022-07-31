@@ -7,7 +7,7 @@ class LogRegCFG:
     required_number_dates = 6
     decision_rule = 'octile'
     penalty = 'none'
-    regularize_strength = 1.0
+    regularize_strength = .001
 
 
 class NNCFG:

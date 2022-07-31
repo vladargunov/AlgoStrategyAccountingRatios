@@ -22,17 +22,17 @@ def main(strategy, frequency, decision_rule, type_model, initial_value,
                    max_allocation_short=max_allocation_short)
 
     if strategy == 'OLSRatios':
-        sr = OLSRatios()
         OLSCFG.decision_rule = decision_rule
+        sr = OLSRatios()
 
     elif strategy == 'LogitRatios':
-        sr = LogitRatios()
         LogRegCFG.decision_rule = decision_rule
-    elif strategy == 'NNRatios':
-        sr = NNRatios()
-        NNRatios.decision_rule = decision_rule
-        NNRatios.type_model = type_model
+        sr = LogitRatios()
 
+    elif strategy == 'NNRatios':
+        NNCFG.decision_rule = decision_rule
+        NNCFG.type_model = type_model
+        sr = NNRatios()
 
     sm = Simulator(dm, pf, sr, frequency, start_date, end_date)
 
@@ -40,7 +40,7 @@ def main(strategy, frequency, decision_rule, type_model, initial_value,
     sm.compute_metrics(risk_free_rate=risk_free_rate)
 
     if save_history:
-        sm.save_history(strategy)
+        sm.save_history()
 
 
 if __name__ == '__main__':
