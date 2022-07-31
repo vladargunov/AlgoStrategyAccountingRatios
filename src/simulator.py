@@ -160,5 +160,6 @@ class Simulator():
         else:
             history = joblib.load(file_path)
             history[key] = current_history
-            
+            joblib.dump(history, file_path)
+
         print(f'Current model is saved to {file_path} with the key {key}')
