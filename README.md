@@ -9,7 +9,7 @@ The current report intends to analyse how the ideas outlined in Olson, Mossman (
 
 1. Clone the repo and navigate to the root of it
 
-2. Make a directory named data and download two files from Kaggle * [Augmented Chinese Stock Data w/ FRs & Fundamentals](https://www.kaggle.com/datasets/franciscofeng/augmented-china-stock-data-with-fundamentals) * dataset and place them into the created folder.
+2. Make a directory named data and download two files from Kaggle *[Augmented Chinese Stock Data w/ FRs & Fundamentals](https://www.kaggle.com/datasets/franciscofeng/augmented-china-stock-data-with-fundamentals)* dataset and place them into the created folder.
 
 3. Given the system has [Conda](https://docs.conda.io/en/latest/) installed, navigate to the project root directory and execute the following script
 
