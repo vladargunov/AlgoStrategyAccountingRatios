@@ -7,7 +7,7 @@ from src.strategies.cfg import NNCFG
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer, seed_everything
 from pytorch_lightning.loggers import CSVLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.utilities import seed_everything
+from pytorch_lightning.utilities.seed import seed_everything
 
 import torch
 import torch.nn as nn
